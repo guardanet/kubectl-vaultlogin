@@ -14,7 +14,8 @@
 -   [Overview](#Overview)
 -   [Installation](#Installation)
     -   [Download From release page](#Download-From-release-page)
-    -   [Verify artifacts](#Verify-artifacts)
+        -   [Verify artifacts](#Verify-artifacts)
+    -   [Using Go install](#Using-Go-install)
     -   [(OPTIONAL) Install plugin locally](#(OPTIONAL)-Install-plugin-locally)
 -   [SLSA3 Build Process](#SLSA3-Build-Process)
     -   [Configure your ArgoCD cluster type secret](#Configure-your-ArgoCD-cluster-type-secret)
@@ -58,26 +59,43 @@ The below diagram depicts all entites involved as well as API calls exchanged be
 
 
 # Installation
-## Download From release page
+## Download from release page
 Visit the [release page](https://github.com/guardanet/kubectl-vaultlogin/releases) and download the correct *kubectl-vaultlogin* plugin for your architecture.
 
-## Verify artifacts
+### Verify artifacts
 For details on how artifacts are built see the below section [SLSA3 Build Process](#SLSA3-Build-Process)
 1. Run the verifier to verify the binary
     ```shell
     slsa-verifier verify-artifact kubectl-vaultlogin_<version>-<os>-<arch> --provenance-path kubectl-vaultlogin_<version>-<os>-<arch>.intoto.jsonl --source-uri github.com/guardanet/kubectl-vaultlogin --source-tag <TAG>
     ```
-2. Run the verifier to verify the remaining artifacts
+2. Run the verifier to verify SBOM
     ```shell
     slsa-verifier verify-artifact kubectl-vaultlogin_<version>-<os>-<arch>-sbom.spdx.json --provenance-path multiple.intoto.jsonl --source-uri github.com/guardanet/kubectl-vaultlogin --source-tag <TAG>
     ```
 
+## Using Go install
+If you have Go installed, you can use Go to retrieve the *kubectl-vaultlogin* binary
+
+```
+go install -v github.com/guardanet/kubectl-vaultlogin@latest
+```
+
 ## (OPTIONAL) Install plugin locally
-Once downlaoded you can install it like so,
+Once you have downlaoded the binary you can install it as follows:
+- If you downloaded from release page
 ```
 sudo install -m 755 kubectl-vaultlogin_<version>-<os>-<arch> /usr/local/bin/kubectl-vaultlogin
+```
+- If you installed with Go
+```
+sudo install -m 755 $GOPATH/kubectl-vaultlogin /usr/local/bin/
+```
+
+Setup bash completion
+```
 echo 'source <(kubectl-vaultlogin completion bash)' >> ~/.bashrc && source ~/.bashrc
 ```
+
 Run help to get more details on available commands and flags
 ```
 $ kubectl-vaultlogin --help
@@ -86,6 +104,7 @@ or,
 ```
 $ kubectl vaultlogin --help
 ```
+
 
 # SLSA3 Build Process
 Build process of the *kubectl-vaultlogin* plugin consists of three phases:
@@ -107,7 +126,7 @@ Give the above to verify the binary, SBOMs and checksums
     ```
     slsa-verifier verify-artifact kubectl-vaultlogin_<version>-<os>-<arch> --provenance-path kubectl-vaultlogin_<version>-<os>-<arch>.intoto.jsonl --source-uri github.com/guardanet/kubectl-vaultlogin --source-tag <TAG>
     ```
-4. Run the verifier to verify the remaining artifacts
+4. Run the verifier to verify SBOM
     ```shell
     slsa-verifier verify-artifact kubectl-vaultlogin_<version>-<os>-<arch>-sbom.spdx.json --provenance-path multiple.intoto.jsonl --source-uri github.com/guardanet/kubectl-vaultlogin --source-tag <TAG>
     ```
