@@ -1,0 +1,146 @@
+name: release-and-sbom
+on:
+  push:
+    tags:
+      - "v*" # triggers only if push new tag version, like `0.8.4` or else
+
+# Declare default deny permissions
+permissions: {}
+
+jobs:
+  # 1st JOB: Generate ldflags dynamically.
+  # Optional: only needed for ldflags.
+  args:
+    runs-on: ubuntu-latest
+    outputs:
+      commit-date: ${{ steps.ldflags.outputs.commit-date }}
+      commit: ${{ steps.ldflags.outputs.commit }}
+      version: ${{ steps.ldflags.outputs.version }}
+      tree-state: ${{ steps.ldflags.outputs.tree-state }}
+      tag: ${{ steps.ldflags.outputs.tag }}
+    steps:
+      - id: checkout
+        uses: actions/checkout@ec3a7ce113134d7a93b817d10a8272cb61118579 # tag=v2.3.4
+        with:
+          fetch-depth: 0
+      - id: ldflags
+        run: |
+          echo "commit-date=$(git log --date=iso8601-strict -1 --pretty=%ct)" >> "$GITHUB_OUTPUT"
+          echo "commit=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+          echo "version=$(git describe --tags --always --dirty | cut -c2-)" >> "$GITHUB_OUTPUT"
+          echo "tree-state=$(if git diff --quiet; then echo "clean"; else echo "dirty"; fi)" >> "$GITHUB_OUTPUT"
+          echo "tag=$(git describe --tags --always --dirty)" >> "$GITHUB_OUTPUT"
+
+  # 2nd job - Build application with SLSA that attest to the build process        
+  slsa-builder:
+    name: slsa-builder-${{matrix.os}}-${{matrix.arch}}
+    needs: args
+    permissions:
+      id-token: write # To sign.
+      contents: write # To upload release assets.
+      actions: read   # To read workflow path.
+    strategy:
+      matrix:
+        os:
+          - linux
+        arch:
+          - amd64
+    uses: slsa-framework/slsa-github-generator/.github/workflows/builder_go_slsa3.yml@v2.0.0
+    with:
+      go-version: 1.22
+      evaluated-envs: "COMMIT_DATE:${{needs.args.outputs.commit-date}}, COMMIT:${{needs.args.outputs.commit}}, VERSION:${{needs.args.outputs.version}}, TREE_STATE:${{needs.args.outputs.tree-state}}"
+      config-file: .slsa-goreleaser/${{matrix.os}}-${{matrix.arch}}.yml
+      upload-assets: true
+  
+  sbom:
+    name: sbom-${{matrix.os}}-${{matrix.arch}}
+    needs: 
+      - slsa-builder
+      - args
+    runs-on: ubuntu-latest
+
+    outputs:
+      hashes: ${{ steps.subjects.outputs.hashes }}
+
+    strategy:
+      matrix:
+        os:
+          - linux
+        arch:
+          - amd64
+    permissions:
+      contents: write # To upload release assets.
+
+    steps: 
+      - name: Checkout Code
+        uses: actions/checkout@ec3a7ce113134d7a93b817d10a8272cb61118579 # tag=v2.3.4
+
+      - name: Generate SBOM and Checksum
+        env: 
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        id: generate_sbom_checksum
+        run: |
+          TAG=$(gh release list --limit 1 | awk '{print $1}')
+          # download only the binary
+          gh release download $TAG -p "${{ github.event.repository.name }}_${{needs.args.outputs.version}}-${{matrix.os}}-${{matrix.arch}}"
+          # install syft
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+          # generate and upload SBOM
+          syft ${{ github.event.repository.name }}_${{needs.args.outputs.version}}-${{matrix.os}}-${{matrix.arch}} --output spdx-json=${{ github.event.repository.name }}_${{needs.args.outputs.version}}-${{matrix.os}}-${{matrix.arch}}.sbom.spdx.json
+          syft ${{ github.event.repository.name }}_${{needs.args.outputs.version}}-${{matrix.os}}-${{matrix.arch}} --output cyclonedx-json=${{ github.event.repository.name }}_${{needs.args.outputs.version}}-${{matrix.os}}-${{matrix.arch}}.sbom.cyclonedx.json
+          gh release upload $TAG ${{ github.event.repository.name }}_${{needs.args.outputs.version}}-${{matrix.os}}-${{matrix.arch}}.sbom.spdx.json
+          gh release upload $TAG ${{ github.event.repository.name }}_${{needs.args.outputs.version}}-${{matrix.os}}-${{matrix.arch}}.sbom.cyclonedx.json
+          # create checksum.txt
+          for file in ${{ github.event.repository.name }}*; do
+            sha256sum "$file" >> checksum.txt
+          done
+          # upload checksum.txt to release 
+          gh release upload $TAG checksum.txt
+
+      - name: Generate subjects
+        id: subjects
+        run: |
+          hashes=$(cat checksum.txt | base64 -w0)
+          echo "hashes=$hashes" >> $GITHUB_OUTPUT
+  
+  provenance:
+    strategy:
+      matrix:
+        os:
+          - linux
+        arch:
+          - amd64
+    needs: 
+      - args
+      - sbom
+    permissions:
+      actions: read # To read the workflow path.
+      id-token: write # To sign the provenance.
+      contents: write # To add assets to a release.
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v2.0.0
+    with:
+      base64-subjects: "${{ needs.sbom.outputs.hashes }}"
+      upload-assets: true # do not upload to a new release as we are working in the new release
+      upload-tag-name: ${{needs.args.outputs.tag}}
+  # upload-provenance:
+  #   strategy:
+  #     matrix:
+  #       os:
+  #         - linux
+  #       arch:
+  #         - amd64
+  #   needs: provenance
+  #   permissions:
+  #     actions: read # To read the workflow path.    
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout Code
+  #       uses: actions/checkout@ec3a7ce113134d7a93b817d10a8272cb61118579 # tag=v2.3.4
+
+  #     - name: Download Release Artifact
+  #       id: upload_provenance
+  #       env: 
+  #         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  #       run: |
+  #         TAG=$(gh release list --limit 1 | awk '{print $1}')
+  #         gh release upload $TAG ${{ needs.provenance.outputs.provenance-name }}
