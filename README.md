@@ -1,10 +1,13 @@
 # kubectl-vaultlogin 
+
+[![Go Report Card](https://img.shields.io/badge/go%20report-A+-brightgreen.svg?style=flat)](https://goreportcard.com/badge/github.com/guardanet/kubectl-vaultlogin)
 [![Go Test](https://github.com/guardanet/kubectl-vaultlogin/actions/workflows/go-test.yml/badge.svg)](https://github.com/guardanet/kubectl-vaultlogin/actions/workflows/go-test.yml) 
-[![Go Report Card](https://goreportcard.com/badge/github.com/guardanet/kubectl-vaultlogin)](https://goreportcard.com/report/github.com/guardanet/kubectl-vaultlogin)
 [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/guardanet/kubectl-vaultlogin/badge)](https://api.securityscorecards.dev/projects/github.com/guardanet/kubectl-vaultlogin)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/gojp/goreportcard/blob/master/LICENSE)
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=guardanet_test&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=guardanet_kubectl-vaultlogin)
 [![SLSA 3](https://slsa.dev/images/gh-badge-level3.svg)](https://slsa.dev)
+
+
 
 ## Table Of Contents
 
