@@ -53,6 +53,11 @@ jobs:
       upload-assets: true
   
   sbom:
+    permissions:
+      contents: write # To upload release assets.
+      actions: read   # To read workflow path.
+      security-events: write # To upload sarif file with vuln scan results
+
     name: sbom-${{matrix.os}}-${{matrix.arch}}
     needs: 
       - slsa-builder
@@ -68,34 +73,48 @@ jobs:
           - linux
         arch:
           - amd64
-    permissions:
-      contents: write # To upload release assets.
 
     steps: 
       - name: Checkout Code
         uses: actions/checkout@ec3a7ce113134d7a93b817d10a8272cb61118579 # tag=v2.3.4
 
-      - name: Generate SBOM and Checksum
-        env: 
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        id: generate_sbom_checksum
+      - name: Download Artifact
+        uses: actions/download-artifact@65a9edc5881444af0b9093a5e628f2fe47ea3b2e # v4.1.7
+        with:
+          name: ${{ github.event.repository.name }}_${{needs.args.outputs.version}}-${{matrix.os}}-${{matrix.arch}}
+
+      - name: Create SBOM
+        uses: anchore/sbom-action@e8d2a6937ecead383dfe75190d104edd1f9c5751 #v0.16.0 
+        with:
+          format: spdx-json
+          artifact-name: ${{ github.event.repository.name }}_${{needs.args.outputs.version}}-${{matrix.os}}-${{matrix.arch}}-sbom.spdx.json
+          output-file: ${{ github.event.repository.name }}_${{needs.args.outputs.version}}-${{matrix.os}}-${{matrix.arch}}-sbom.spdx.json
+
+      - name: 
+        id: scan
+        uses: anchore/scan-action@3343887d815d7b07465f6fdcd395bd66508d486a #v3.6.4
+        with:
+          sbom: ${{ github.event.repository.name }}_${{needs.args.outputs.version}}-${{matrix.os}}-${{matrix.arch}}-sbom.spdx.json
+          fail-build: true
+          severity-cutoff: critical
+
+      - name: upload Anchore scan SARIF report
+        uses: github/codeql-action/upload-sarif@9fdb3e49720b44c48891d036bb502feb25684276 # v3.25.6
+        with:
+          sarif_file: ${{ steps.scan.outputs.sarif }}
+
+      - name: Generate Checksum
         run: |
-          TAG=$(gh release list --limit 1 | awk '{print $1}')
-          # download only the binary
-          gh release download $TAG -p "${{ github.event.repository.name }}_${{needs.args.outputs.version}}-${{matrix.os}}-${{matrix.arch}}"
-          # install syft
-          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
-          # generate and upload SBOM
-          syft ${{ github.event.repository.name }}_${{needs.args.outputs.version}}-${{matrix.os}}-${{matrix.arch}} --output spdx-json=${{ github.event.repository.name }}_${{needs.args.outputs.version}}-${{matrix.os}}-${{matrix.arch}}.sbom.spdx.json
-          syft ${{ github.event.repository.name }}_${{needs.args.outputs.version}}-${{matrix.os}}-${{matrix.arch}} --output cyclonedx-json=${{ github.event.repository.name }}_${{needs.args.outputs.version}}-${{matrix.os}}-${{matrix.arch}}.sbom.cyclonedx.json
-          gh release upload $TAG ${{ github.event.repository.name }}_${{needs.args.outputs.version}}-${{matrix.os}}-${{matrix.arch}}.sbom.spdx.json
-          gh release upload $TAG ${{ github.event.repository.name }}_${{needs.args.outputs.version}}-${{matrix.os}}-${{matrix.arch}}.sbom.cyclonedx.json
-          # create checksum.txt
           for file in ${{ github.event.repository.name }}*; do
             sha256sum "$file" >> checksum.txt
           done
-          # upload checksum.txt to release 
-          gh release upload $TAG checksum.txt
+          cat checksum.txt
+
+      - name: Upload Checksum
+        uses: softprops/action-gh-release@0a76e4214a22dfa2946790a0b56e12720488e0d2 #v2.0.5
+        with:
+          files: |
+            checksum.txt
 
       - name: Generate subjects
         id: subjects
