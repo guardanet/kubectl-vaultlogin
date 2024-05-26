@@ -1,4 +1,4 @@
-kubectl-vaultlogin*
+./kubectl-vaultlogin*
 kvl-token
 input-ec*
 **/deprecated/
