@@ -1,6 +1,6 @@
 # kubectl-vaultlogin 
 [![Go Test](https://github.com/guardanet/kubectl-vaultlogin/actions/workflows/go-test.yml/badge.svg)](https://github.com/guardanet/kubectl-vaultlogin/actions/workflows/go-test.yml) 
-[![Go Report Card](https://goreportcard.com/badge/github.com/guardanet/kubectl-vaultlogin)](https://goreportcard.com/report/github.com/guardanet/kubectl-vaultlogin) 
+[![Go Report Card](https://goreportcard.com/badge/github.com/guardanet/kubectl-vaultlogin)](https://goreportcard.com/report/github.com/guardanet/kubectl-vaultlogin)
 [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/guardanet/kubectl-vaultlogin/badge)](https://api.securityscorecards.dev/projects/github.com/guardanet/kubectl-vaultlogin)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/gojp/goreportcard/blob/master/LICENSE)
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=guardanet_test&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=guardanet_kubectl-vaultlogin)
@@ -61,13 +61,14 @@ Visit the [release page](https://github.com/guardanet/kubectl-vaultlogin/release
 ## Verify artifacts
 For details on how artifacts are built see the below section [SLSA3 Build Process](#SLSA3-Build-Process)
 1. Run the verifier to verify the binary
-    ```
+    ```shell
     slsa-verifier verify-artifact kubectl-vaultlogin_<version>-<os>-<arch> --provenance-path kubectl-vaultlogin_<version>-<os>-<arch>.intoto.jsonl --source-uri github.com/guardanet/kubectl-vaultlogin --source-tag <TAG>
     ```
 2. Run the verifier to verify the remaining artifacts
+    ```shell
+    slsa-verifier verify-artifact kubectl-vaultlogin_<version>-<os>-<arch>-sbom.spdx.json --provenance-path multiple.intoto.jsonl --source-uri github.com/guardanet/kubectl-vaultlogin --source-tag <TAG>
     ```
-    slsa-verifier verify-artifact kubectl-vaultlogin_<version>-<os>-<arch>.sbom.spdx.json --provenance-path multiple.intoto.jsonl --source-uri github.com/guardanet/kubectl-vaultlogin --source-tag <TAG>
-    ```
+
 ## (OPTIONAL) Install plugin locally
 Once downlaoded you can install it like so,
 ```
@@ -84,13 +85,15 @@ $ kubectl vaultlogin --help
 ```
 
 # SLSA3 Build Process
-Build process of the *kubectl-vaultlogin* plugin consists of two phases:
+Build process of the *kubectl-vaultlogin* plugin consists of three phases:
 1. The [SLSA3 Go Builder](https://github.com/slsa-framework/slsa-github-generator/tree/main/internal/builders/go) is used to build the binary. This attests to the builder as well as the build process, producing corresponding provenance. The *buildConfig*, that is part of the provenance, contains the following fields:
     - *version*: The version of the BuildConfig format.
     - *steps*: The steps that were performed in the build.
     - *steps[\*].command*: The list of commands that were executed in a step.
 
-2. Subsequently cheksum.txt and two SBOMs (spdx and cyclonedx) are created and the [Generic SLSA3 Genetor](https://github.com/slsa-framework/slsa-github-generator/tree/main/internal/builders/generic) is used to generate a non-forgeable attestation to the artifacts' digests using the identity of the GitHub workflow
+2. During 2nd phase an SPDX SBOMs is created and uploaded and ysed to carry out a vulnerability scan, In case no CRITICAL vulnerabilities are identitfied, the scan report is uploaded, checksums are calculated and the build continues
+
+3. Fonally [Generic SLSA3 Genetor](https://github.com/slsa-framework/slsa-github-generator/tree/main/internal/builders/generic) is used to generate a non-forgeable attestation to the artifacts' digests using the identity of the GitHub workflow
 
 Give the above to verify the binary, SBOMs and checksums 
 1. Install [slsa-verifier](https://github.com/slsa-framework/slsa-verifier#installation).
@@ -103,7 +106,7 @@ Give the above to verify the binary, SBOMs and checksums
     ```
 4. Run the verifier to verify the remaining artifacts
     ```shell
-    slsa-verifier verify-artifact kubectl-vaultlogin_<version>-<os>-<arch>.sbom.spdx.json --provenance-path multiple.intoto.jsonl --source-uri github.com/guardanet/kubectl-vaultlogin --source-tag <TAG>
+    slsa-verifier verify-artifact kubectl-vaultlogin_<version>-<os>-<arch>-sbom.spdx.json --provenance-path multiple.intoto.jsonl --source-uri github.com/guardanet/kubectl-vaultlogin --source-tag <TAG>
     ```
 
 # Getting Started
