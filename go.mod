@@ -5,7 +5,7 @@ go 1.22.2
 require (
 	github.com/golang-jwt/jwt/v4 v4.5.0
 	github.com/hashicorp/vault-client-go v0.4.3
-	github.com/spf13/cobra v1.8.0
+	github.com/spf13/cobra v1.8.1
 	github.com/spf13/viper v1.18.2
 	github.com/stretchr/testify v1.9.0
 	k8s.io/apimachinery v0.30.1
